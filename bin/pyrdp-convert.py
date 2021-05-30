@@ -14,7 +14,7 @@ from pyrdp.mitm.state import RDPMITMState
 from pyrdp.recording import FileLayer
 from pyrdp.player.BaseEventHandler import BaseEventHandler
 from pyrdp.player.JsonEventHandler import JsonEventHandler
-from pyrdp.player.Replay import Replay
+from pyrdp.player.Replay import Replay, GC_COLLECT_INTERVAL
 from pyrdp.layer import PlayerLayer, LayerChainItem
 
 from pyrdp.player import HAS_GUI
@@ -30,6 +30,7 @@ import logging
 import struct
 import time
 import sys
+import gc
 
 
 """
@@ -466,8 +467,11 @@ class Converter:
                 print("The input file is already a replay file. Nothing to do.")
                 sys.exit(1)
 
-            for event, _ in progressbar(replay):
+            for i, (event, _) in enumerate(progressbar(replay)):
                 sink.onPDUReceived(event)
+                del event
+                if i % GC_COLLECT_INTERVAL == 0:
+                    gc.collect()
 
             print(f"\n[+] Succesfully wrote '{outfile}'")
             sink.cleanup()

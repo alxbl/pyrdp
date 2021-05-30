@@ -5,12 +5,23 @@
 #
 
 import os
+import gc
 from collections import defaultdict
 from typing import BinaryIO, Dict, List, Optional
 
 from pyrdp.core import FilePositionGuard
 from pyrdp.layer import PlayerLayer
 from pyrdp.pdu import PlayerPDU
+
+
+"""
+Interval after which to force a garbage collection to release memory.
+
+This helps processing large replay files by freeing up memory consumed while
+processing PDUs. Every time this many events are processed, a garbage collection
+will be forced.
+"""
+GC_COLLECT_INTERVAL = 1000
 
 
 class Replay:
@@ -37,6 +48,9 @@ class Replay:
             def registerEvent(pdu: PlayerPDU):
                 nonlocal currentMessagePosition
                 events[pdu.timestamp].append(currentMessagePosition)
+                del pdu  # We are not interested in the PDU, we only want the file position.
+                if GC_COLLECT_INTERVAL > 0 and len(events) % GC_COLLECT_INTERVAL == 0:
+                    gc.collect()
 
             # Register the offset of every event in the file.
             player = PlayerLayer()
@@ -86,7 +100,7 @@ class ReplayReader:
         self.timestamps = self.replay.getSortedTimestamps()
         self.eventPositions = self.replay.getSortedEvents()
         self.player = PlayerLayer()
-        self.observer = self.player.createObserver(onPDUReceived = lambda: None)
+        self.observer = self.player.createObserver(onPDUReceived=lambda: None)
         self.n = 0
 
     """
