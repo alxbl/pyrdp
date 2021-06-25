@@ -538,6 +538,14 @@ if __name__ == "__main__":
         help="Path to write the converted files to. If a file name is specified, it will be used as a prefix,"
         "otherwise the result is output next to the source file with the proper extension.",
     )
+    parser.add_argument(
+        "--start", help="The start timestamp for thumbnail stream extraction",
+        type=int
+    )
+    parser.add_argument(
+        "--stop", help="The start timestamp for thumbnail stream extraction",
+        type=int
+    )
     args = parser.parse_args()
 
     if not HAS_GUI and args.format in ['mp4', 'png']:

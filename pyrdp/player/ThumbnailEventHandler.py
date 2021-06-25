@@ -15,6 +15,7 @@ import av
 from PIL import ImageQt
 from PySide2.QtGui import QImage, QPainter, QColor
 from os import path
+from pathlib import Path
 
 from pyrdp.player.Mp4EventHandler import Mp4Sink
 
@@ -56,8 +57,14 @@ class ThumbnailEventHandler(RenderingEventHandler):
         # Timestamps are in milliseconds.
         self.delta = (args.thumbnails if args.thumbnails else DEFAULT_DELTA) * 1000
 
+        self.start = args.start if args.start else None
+        self.stop = args.stop if args.stop else None
+
         if args.output:
             self.dst = args.output
+
+        outDir = Path(self.dst)
+        outDir.mkdir(exist_ok=True)
 
     def onMousePosition(self, x, y):
         self.mouse = (x, y)
@@ -73,11 +80,21 @@ class ThumbnailEventHandler(RenderingEventHandler):
         self._writeFrame(self.sink.screen)
 
     def _writeFrame(self, surface: QImage):
-        # Draw the mouse pointer. Render mouse clicks?
+        # We need to play from the beginning to get the full image.
+        # just ignore the delta for frames before the start time.
+        if self.start and self.timestamp < self.start:
+            return
+
+        if self.stop and self.timestamp > self.stop:
+            # We could technically exit here, but this is easier for now.
+            # This code will need to be refactored if we ever bring it into
+            # the main branch.
+            return
+
         if self.timestamp - self.prevTimestamp < self.delta:
             return
 
-        tmp = surface.copy()
+        tmp = surface.copy()  # create a copy of the frame to paint the cursor.
         p = QPainter(tmp)
         p.setBrush(QColor.fromRgb(255, 255, 0, 180))
         (x, y) = self.mouse
