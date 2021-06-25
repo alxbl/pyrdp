@@ -12,4 +12,4 @@ from pathlib import Path
 """
 The default configuration for the Player.
 """
-DEFAULTS =  settings.load(Path(__file__).parent.absolute() / "player.default.ini")
+DEFAULTS = settings.load(Path(__file__).parent.absolute() / "player.default.ini")

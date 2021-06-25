@@ -42,6 +42,14 @@ class BaseEventHandler(Observer):
             PlayerPDUType.DEVICE_MAPPING: self.onDeviceMapping,
         }
 
+    def configure(self, args):
+        """
+        Called when the event handler is created.
+
+        :param args: The command line arguments for the program.
+        """
+        pass
+
     def writeText(self, text: str):
         pass
 

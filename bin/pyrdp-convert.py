@@ -42,7 +42,10 @@ HANDLERS = {"replay": (None, "pyrdp"), "json": (JsonEventHandler, "json")}
 
 if HAS_GUI:
     from pyrdp.player.Mp4EventHandler import Mp4EventHandler
+    from pyrdp.player.ThumbnailEventHandler import ThumbnailEventHandler
+
     HANDLERS["mp4"] = (Mp4EventHandler, "mp4")
+    HANDLERS["png"] = (ThumbnailEventHandler, "png")
 else:
     # Class stub for when MP4 support is not available.
     # It would be a good idea to refactor this so that Mp4EventHandler is
@@ -122,6 +125,7 @@ class RDPReplayer(RDPMITM):
         state = RDPMITMState(config, log.sessionID)
 
         sink, outfile = getSink(format, output_path)
+        sink.configure(self.args)
         transport = ConversionLayer(sink) if sink else FileLayer(outfile)
         rec = CustomMITMRecorder([transport], state)
 
@@ -462,6 +466,7 @@ class Converter:
 
             outfile = self.prefix + infile.stem
             sink, outfile = getSink(self.args.format, outfile)
+            sink.configure(self.args)
 
             if not sink:
                 print("The input file is already a replay file. Nothing to do.")
@@ -510,6 +515,12 @@ if __name__ == "__main__":
         default="replay",
     )
     parser.add_argument(
+        '--thumbnails',
+        help="Frequency (in seconds) at which to save thumbnails for `-f png`",
+        type=int,
+        default=300
+    )
+    parser.add_argument(
         "--src",
         help="If specified, limits the converted streams to connections initiated from this address",
         action="append",
@@ -529,7 +540,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    if not HAS_GUI and args.format == 'mp4':
+    if not HAS_GUI and args.format in ['mp4', 'png']:
         print('Error: MP4 conversion requires the full PyRDP installation.')
         sys.exit(1)
 
