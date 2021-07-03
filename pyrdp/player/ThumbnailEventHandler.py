@@ -3,22 +3,19 @@
 # Copyright (C) 2020-2021 GoSecure Inc.
 # Licensed under the GPLv3 or later.
 #
-
-from pyrdp.enum import BitmapFlags, CapabilityType
-from pyrdp.pdu import BitmapUpdateData, PlayerPDU
-from pyrdp.player.RenderingEventHandler import RenderingEventHandler
-from pyrdp.ui import RDPBitmapToQtImage
-
 import logging
-
-import av
-from PIL import ImageQt
-from PySide2.QtGui import QImage, QPainter, QColor
+import os
+import pickle
 from os import path
 from pathlib import Path
 
-from pyrdp.player.Mp4EventHandler import Mp4Sink
+from PySide2.QtGui import QColor, QImage, QPainter
 
+from pyrdp.enum import CapabilityType
+from pyrdp.pdu import PlayerPDU
+from pyrdp.player.gdi.SerializableBitmapCache import SerializableBitmapCache
+from pyrdp.player.Mp4EventHandler import Mp4Sink
+from pyrdp.player.RenderingEventHandler import RenderingEventHandler
 
 DEFAULT_DELTA = 300  # seconds
 
@@ -104,5 +101,16 @@ class ThumbnailEventHandler(RenderingEventHandler):
         tmp.save(path.join(self.dst, f'{self.timestamp}.png'))
         del tmp
 
+        self.save_bitmap_cache()
 
-
+    def save_bitmap_cache(self):
+        gdi_cache_directory = path.join(self.dst, 'gdi_cache')
+        serializable_bitmaps = {}
+        for key, bitmap in self.gdi.bitmaps.caches.items():
+            serializable_bitmaps[key] = SerializableBitmapCache(bitmap)
+        if not os.path.exists(gdi_cache_directory):
+            os.makedirs(gdi_cache_directory, exist_ok=True)
+        bitmapCachePath = path.join(gdi_cache_directory, f'{self.timestamp}.bitmapcache')
+        with open(bitmapCachePath, "wb") as file:
+            pickle.dump(serializable_bitmaps, file)
+            del serializable_bitmaps

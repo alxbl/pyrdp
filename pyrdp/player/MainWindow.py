@@ -3,7 +3,7 @@
 # Copyright (C) 2018-2020 GoSecure Inc.
 # Licensed under the GPLv3 or later.
 #
-from typing import List
+from typing import List, Optional
 
 from PySide2.QtCore import Qt, Signal
 from PySide2.QtWidgets import QAction, QFileDialog, QInputDialog, QMainWindow, QTabWidget
@@ -20,7 +20,7 @@ class MainWindow(QMainWindow):
 
     updateCountSignal = Signal()
 
-    def __init__(self, bind_address: str, port: int, filesToRead: [str]):
+    def __init__(self, bind_address: str, port: int, filesToRead: [str], thumbnails_directory: Optional[str]):
         """
         :param bind_address: address to bind to when listening for live connections.
         :param port: port to bind to when listening for live connections.
@@ -35,7 +35,8 @@ class MainWindow(QMainWindow):
         }
 
         self.liveWindow = LiveWindow(bind_address, port, self.updateCountSignal, self.options, parent=self)
-        self.replayWindow = ReplayWindow(self.options, parent=self)
+        self.replayWindow = ReplayWindow(self.options, parent=self,
+                                         thumbnails_directory=thumbnails_directory)
         self.tabManager = QTabWidget()
         self.tabManager.addTab(self.liveWindow, "Live connections")
         self.tabManager.addTab(self.replayWindow, "Replays")

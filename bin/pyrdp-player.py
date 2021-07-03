@@ -54,6 +54,10 @@ def main():
     parser.add_argument("-b", "--bind", help="Bind address (default: 127.0.0.1)", default="127.0.0.1")
     parser.add_argument("-p", "--port", help="Bind port (default: 3000)", default=3000)
     parser.add_argument("-o", "--output", help="Output folder", default="pyrdp_output")
+    parser.add_argument("-t", "--thumbnails-directory", help="Directory where the thumbnails for "
+                                                            "the current replay files are located."
+                                                            " they are obtained using the -f png "
+                                                            "argument of pyrdp-convert.")
     parser.add_argument("-L", "--log-level", help="Log level", default=None,
                         choices=["INFO", "DEBUG", "WARNING", "ERROR", "CRITICAL"], nargs="?")
     parser.add_argument("-F", "--log-filter",
@@ -87,7 +91,8 @@ def main():
 
     if not args.headless:
         app = QApplication(sys.argv)
-        mainWindow = MainWindow(args.bind, int(args.port), args.replay)
+        mainWindow = MainWindow(args.bind, int(args.port), args.replay,
+                                thumbnails_directory=args.thumbnails_directory)
         mainWindow.showMaximized()
         mainWindow.show()
 

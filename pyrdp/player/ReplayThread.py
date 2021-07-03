@@ -8,6 +8,7 @@ import queue
 from enum import IntEnum
 from multiprocessing import Queue
 from time import sleep
+from typing import Dict, Optional, Tuple
 
 from PySide2.QtCore import QThread, Signal
 
@@ -36,15 +37,18 @@ class ReplayThread(QThread):
     # We use the object type instead of int for this signal to prevent Python integers from being converted to 32-bit integers
     eventReached = Signal(object)
     clearNeeded = Signal()
+    paintThumbnail = Signal(str, str)
 
-    def __init__(self, replay: Replay):
+    def __init__(self, replay: Replay, thumbnails: Optional[Dict[int, Tuple[str, str]]] = None):
         super().__init__()
 
+        self.thumbnails = thumbnails
         self.queue = Queue()
         self.lastSeekTime = 0
         self.requestedSpeed = 1
         self.replay = replay
         self.timer = Timer()
+        self.thumbnail_timestamp = 0
 
     def run(self):
         step = 16 / 1000
@@ -64,7 +68,12 @@ class ReplayThread(QThread):
                     elif event == ReplayThreadEvent.PAUSE:
                         self.timer.stop()
                     elif event == ReplayThreadEvent.SEEK:
-                        if self.lastSeekTime < self.timer.getElapsedTime():
+                        if self.thumbnails:
+                            self.thumbnail_timestamp = self.get_thumbnail_timestamp(self.lastSeekTime)
+                            self.paintThumbnail.emit(self.thumbnails[self.thumbnail_timestamp][0],
+                                                     self.thumbnails[self.thumbnail_timestamp][1])
+                            currentIndex = 0
+                        elif self.lastSeekTime < self.timer.getElapsedTime():
                             currentIndex = 0
                             self.clearNeeded.emit()
 
@@ -83,14 +92,24 @@ class ReplayThread(QThread):
 
                 while currentIndex < len(timestamps) and timestamps[currentIndex] / 1000.0 <= currentTime:
                     nextTimestamp = timestamps[currentIndex]
-                    positions = self.replay.events[nextTimestamp]
 
-                    for position in positions:
-                        self.eventReached.emit(position)
+                    # Only replay an event if it's after the latest thumbnail printed.
+                    if not self.thumbnails or nextTimestamp >= self.thumbnail_timestamp:
+                        positions = self.replay.events[nextTimestamp]
+
+                        for position in positions:
+                            self.eventReached.emit(position)
 
                     currentIndex += 1
 
             sleep(step)
+
+    def get_thumbnail_timestamp(self, seek_time: int):
+        best_thumbnail = -1
+        for thumbnail_timestamp in self.thumbnails.keys():
+            if best_thumbnail < thumbnail_timestamp < seek_time * 1000:
+                best_thumbnail = thumbnail_timestamp
+        return best_thumbnail
 
     def play(self):
         self.queue.put(ReplayThreadEvent.PLAY)
