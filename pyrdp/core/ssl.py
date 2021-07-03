@@ -11,7 +11,6 @@ from os import path
 
 import OpenSSL
 from OpenSSL import SSL
-
 from twisted.internet import ssl
 
 
@@ -87,7 +86,10 @@ class CertificateCache():
     def lookup(self, cert: OpenSSL.crypto.X509) -> (str, str):
         subject = cert.get_subject()
         parts = dict(subject.get_components())
-        commonName = parts[b'CN'].decode()
+        try:
+            commonName = parts[b'CN'].decode('utf-8')
+        except UnicodeDecodeError:
+            commonName = parts[b'CN'].decode('utf-16be')
         base = str(self._root / commonName)
 
         if path.exists(base + '.pem'):

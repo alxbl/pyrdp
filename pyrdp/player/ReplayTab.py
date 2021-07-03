@@ -3,11 +3,17 @@
 # Copyright (C) 2019-2021 GoSecure Inc.
 # Licensed under the GPLv3 or later.
 #
-from PySide2.QtGui import QResizeEvent
+import os
+import pickle
+from typing import Dict, Optional
+
+from PySide2.QtCore import QByteArray
+from PySide2.QtGui import QImage, QResizeEvent
 from PySide2.QtWidgets import QApplication, QWidget
 
-from pyrdp.layer import PlayerLayer
 from pyrdp.player.BaseTab import BaseTab
+from pyrdp.player.gdi.cache import BitmapCache
+from pyrdp.player.gdi.SerializableBitmapCache import SerializableBitmapCache
 from pyrdp.player.PlayerEventHandler import PlayerEventHandler
 from pyrdp.player.Replay import Replay, ReplayReader
 from pyrdp.player.ReplayBar import ReplayBar
@@ -20,12 +26,13 @@ class ReplayTab(BaseTab):
     Tab that displays a RDP Connection that is being replayed from a file.
     """
 
-    def __init__(self, fileName: str, parent: QWidget):
+    def __init__(self, fileName: str, parent: QWidget, thumbnail_directory: Optional[str] = None):
         """
         :param fileName: name of the file to read.
         :param parent: parent widget.
         """
         self.viewer = QRemoteDesktop(800, 600, parent)
+
         super().__init__(self.viewer, parent)
         QApplication.instance().aboutToQuit.connect(self.onClose)
 
@@ -33,12 +40,15 @@ class ReplayTab(BaseTab):
         self.file = open(self.fileName, "rb")
         self.eventHandler = PlayerEventHandler(self.widget, self.text)
 
+        thumbnails = self.makeThumbnailsMap(thumbnail_directory)
+
         replay = Replay(self.file)
         self.reader = ReplayReader(replay)
-        self.thread = ReplayThread(replay)
+        self.thread = ReplayThread(replay, thumbnails=thumbnails if thumbnail_directory else None)
         self.thread.eventReached.connect(self.readEvent)
         self.thread.timeUpdated.connect(self.onTimeUpdated)
         self.thread.clearNeeded.connect(self.clear)
+        self.thread.paintThumbnail.connect(self.paintThumbnail)
         self.thread.start()
 
         self.controlBar = ReplayBar(replay.duration)
@@ -50,6 +60,20 @@ class ReplayTab(BaseTab):
         self.controlBar.button.setDefault(True)
 
         self.tabLayout.insertWidget(0, self.controlBar)
+
+    def makeThumbnailsMap(self, thumbnail_directory):
+        thumbnails = {}
+        first_thumbnail_timestamp = 0
+        if thumbnail_directory:
+            for i, file in enumerate(os.listdir(thumbnail_directory)):
+                if file.endswith(".png"):
+                    timestamp = int(file.replace('.png', ''))
+                    if i == 0:
+                        first_thumbnail_timestamp = timestamp
+                    thumbnails[timestamp - first_thumbnail_timestamp] = (
+                    f"{thumbnail_directory}/{file}",
+                    f"{thumbnail_directory}/gdi_cache/{file}".replace('.png', '.bitmapcache'))
+        return thumbnails
 
     def play(self):
         self.controlBar.button.setPlaying(True)
@@ -78,6 +102,25 @@ class ReplayTab(BaseTab):
         """
         self.viewer.clear()
         self.text.setText("")
+
+    def paintThumbnail(self, thumbnailFilePath: str, bitmapCachePath: str):
+        with open(thumbnailFilePath, 'rb') as file:
+            png_content = file.read()
+
+        qimage = QImage()
+        qimage.loadFromData(QByteArray(png_content))
+        self.viewer.notifyImage(0, 0, qimage, qimage.width(), qimage.height())
+
+        # We also need to deserialize the bitmap cache.
+        print(f"load {bitmapCachePath}")
+        with open(bitmapCachePath, 'rb') as file:
+            serializableBitmapCaches: Dict[int, SerializableBitmapCache] = pickle.load(file)
+
+        bitmapCache = BitmapCache()
+        for key, serializableCache in serializableBitmapCaches.items():
+            bitmapCache.caches[key] = serializableCache.cache
+
+        self.eventHandler.gdi.bitmaps = bitmapCache
 
     def onClose(self):
         self.thread.close()

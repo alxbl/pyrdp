@@ -4,7 +4,7 @@
 # Licensed under the GPLv3 or later.
 #
 
-from typing import Dict
+from typing import Dict, Optional
 
 from PySide2.QtGui import QResizeEvent
 from PySide2.QtWidgets import QWidget
@@ -18,15 +18,17 @@ class ReplayWindow(BaseWindow):
     Class for managing replay tabs.
     """
 
-    def __init__(self, options: Dict[str, object], parent: QWidget):
+    def __init__(self, options: Dict[str, object], parent: QWidget,
+                 thumbnails_directory: Optional[str]):
         super().__init__(options, parent=parent)
+        self.thumbnails_directory = thumbnails_directory
 
     def openFile(self, fileName: str, autoplay: bool = False):
         """
         Open a replay file and open a new tab.
         :param fileName: replay path.
         """
-        tab = ReplayTab(fileName, parent=self)
+        tab = ReplayTab(fileName, parent=self, thumbnail_directory=self.thumbnails_directory)
         self.addTab(tab, fileName)
         self.log.debug("Loading replay file %(arg1)s", {"arg1": fileName})
         if autoplay:
